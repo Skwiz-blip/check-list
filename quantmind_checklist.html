@@ -877,6 +877,66 @@ const phases = [
 let allItems = {};
 let filterActive = false;
 
+const CHECKLIST_LIST = (() => {
+  const file = (location.pathname.split('/').pop() || 'index').replace('.html', '');
+  return file || 'index';
+})();
+
+let syncInFlight = false;
+
+async function apiGetState(){
+  const res = await fetch(`/api/items?list=${encodeURIComponent(CHECKLIST_LIST)}`, { cache: 'no-store' });
+  if(!res.ok) throw new Error(`GET /api/items failed: ${res.status}`);
+  return await res.json();
+}
+
+async function apiSetItem(id, done){
+  const res = await fetch(`/api/items?list=${encodeURIComponent(CHECKLIST_LIST)}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ id, done: !!done })
+  });
+  if(!res.ok) throw new Error(`PUT /api/items failed: ${res.status}`);
+}
+
+async function apiClear(){
+  const res = await fetch(`/api/items?list=${encodeURIComponent(CHECKLIST_LIST)}`, { method: 'DELETE' });
+  if(!res.ok) throw new Error(`DELETE /api/items failed: ${res.status}`);
+}
+
+function applyFilterVisibility(){
+  if(!filterActive) return;
+  Object.values(allItems).forEach(item => {
+    const el = document.getElementById('item-'+item.id);
+    if(!el) return;
+    if(item.done) el.style.display = 'none';
+    else el.style.display = 'flex';
+  });
+}
+
+async function syncFromServer(){
+  if(syncInFlight) return;
+  syncInFlight = true;
+  try {
+    const data = await apiGetState();
+    const remote = (data && data.items) ? data.items : {};
+
+    Object.keys(allItems).forEach(id => {
+      const done = !!remote[id];
+      allItems[id].done = done;
+      const el = document.getElementById('item-' + id);
+      if(el) el.classList.toggle('done', done);
+    });
+
+    updateProgress();
+    applyFilterVisibility();
+  } catch (e) {
+    console.warn('Checklist sync failed:', e);
+  } finally {
+    syncInFlight = false;
+  }
+}
+
 function buildDOM(){
   const container = document.getElementById('phases-container');
   phases.forEach(ph => {
@@ -965,6 +1025,8 @@ function toggleItem(id){
   el.classList.add('flashing');
   setTimeout(() => el.classList.remove('flashing'), 500);
   updateProgress();
+  applyFilterVisibility();
+  apiSetItem(id, item.done).catch(e => console.warn('Checklist save failed:', e));
 }
 
 function togglePhase(id){
@@ -1036,6 +1098,8 @@ function resetAll(){
     document.getElementById('item-'+id).classList.remove('done');
   });
   updateProgress();
+  applyFilterVisibility();
+  apiClear().catch(e => console.warn('Checklist reset failed:', e));
 }
 
 function filterUndone(){
@@ -1053,6 +1117,7 @@ function filterUndone(){
 function exportProgress(){
   const data = {
     date: new Date().toISOString(),
+    list: CHECKLIST_LIST,
     progress: {
       total: Object.keys(allItems).length,
       done: Object.values(allItems).filter(i=>i.done).length
@@ -1066,7 +1131,13 @@ function exportProgress(){
   a.click();
 }
 
-buildDOM();
+async function init(){
+  buildDOM();
+  await syncFromServer();
+  setInterval(syncFromServer, 5000);
+}
+
+init();
 </script>
 </body>
 </html>
