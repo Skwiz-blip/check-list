@@ -1,8 +1,10 @@
 {
   "name": "checklist",
   "private": true,
+  "engines": {
+    "node": "20.x"
+  },
   "dependencies": {
     "@vercel/kv": "^2.0.0"
   }
 }
-
