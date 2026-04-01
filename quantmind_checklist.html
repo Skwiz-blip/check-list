@@ -885,7 +885,7 @@ const CHECKLIST_LIST = (() => {
 let syncInFlight = false;
 
 async function apiGetState(){
-  const res = await fetch(`/api/items?list=${encodeURIComponent(CHECKLIST_LIST)}`, { cache: 'no-store' });
+  const res = await fetch(`/api/items?list=${encodeURIComponent(CHECKLIST_LIST)}&t=${Date.now()}`, { cache: 'no-store' });
   if(!res.ok) throw new Error(`GET /api/items failed: ${res.status}`);
   return await res.json();
 }

@@ -48,6 +48,8 @@ module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,PUT,POST,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  // Prevent edge/browser caching (otherwise other users may not see updates quickly).
+  res.setHeader("Cache-Control", "no-store, max-age=0");
 
   if (req.method === "OPTIONS") return res.status(204).end();
 
@@ -95,4 +97,3 @@ module.exports = async (req, res) => {
     return res.status(500).json({ error: "KV error", detail: String(err && err.message ? err.message : err) });
   }
 };
-
