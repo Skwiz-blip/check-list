@@ -8,12 +8,12 @@ const { Redis } = require("@upstash/redis");
 
 function getRedis(){
   // When Upstash is connected via Vercel Storage, these env vars are auto-injected:
-  // - UPSTASH_REDIS_REST_URL
-  // - UPSTASH_REDIS_REST_TOKEN
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  // - UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN (some setups)
+  // - KV_REST_API_URL / KV_REST_API_TOKEN (Vercel/Upstash integration)
+  const url = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
   if (!url || !token) return null;
-  return Redis.fromEnv();
+  return new Redis({ url, token });
 }
 
 async function readJson(req) {
@@ -69,7 +69,13 @@ module.exports = async (req, res) => {
   if (!redis) {
     return res.status(500).json({
       error: "Redis not configured",
-      detail: "Missing UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN. Connect Upstash for Redis (or Redis) in Vercel Storage to this project (Preview + Production), then redeploy."
+      detail: "Missing Redis REST env vars. Expected KV_REST_API_URL + KV_REST_API_TOKEN (or UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN). Connect your Upstash for Redis to this Vercel project (Preview + Production), then redeploy.",
+      env_present: {
+        KV_REST_API_URL: !!process.env.KV_REST_API_URL,
+        KV_REST_API_TOKEN: !!process.env.KV_REST_API_TOKEN,
+        UPSTASH_REDIS_REST_URL: !!process.env.UPSTASH_REDIS_REST_URL,
+        UPSTASH_REDIS_REST_TOKEN: !!process.env.UPSTASH_REDIS_REST_TOKEN
+      }
     });
   }
 
