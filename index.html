@@ -886,7 +886,12 @@ let syncInFlight = false;
 
 async function apiGetState(){
   const res = await fetch(`/api/items?list=${encodeURIComponent(CHECKLIST_LIST)}&t=${Date.now()}`, { cache: 'no-store' });
-  if(!res.ok) throw new Error(`GET /api/items failed: ${res.status}`);
+  if(!res.ok) {
+    let detail = '';
+    try { detail = JSON.stringify(await res.json()); }
+    catch { try { detail = await res.text(); } catch {} }
+    throw new Error(`GET /api/items failed: ${res.status}${detail ? ' ' + detail : ''}`);
+  }
   return await res.json();
 }
 
@@ -896,12 +901,22 @@ async function apiSetItem(id, done){
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ id, done: !!done })
   });
-  if(!res.ok) throw new Error(`PUT /api/items failed: ${res.status}`);
+  if(!res.ok) {
+    let detail = '';
+    try { detail = JSON.stringify(await res.json()); }
+    catch { try { detail = await res.text(); } catch {} }
+    throw new Error(`PUT /api/items failed: ${res.status}${detail ? ' ' + detail : ''}`);
+  }
 }
 
 async function apiClear(){
   const res = await fetch(`/api/items?list=${encodeURIComponent(CHECKLIST_LIST)}`, { method: 'DELETE' });
-  if(!res.ok) throw new Error(`DELETE /api/items failed: ${res.status}`);
+  if(!res.ok) {
+    let detail = '';
+    try { detail = JSON.stringify(await res.json()); }
+    catch { try { detail = await res.text(); } catch {} }
+    throw new Error(`DELETE /api/items failed: ${res.status}${detail ? ' ' + detail : ''}`);
+  }
 }
 
 function applyFilterVisibility(){
