@@ -4,7 +4,17 @@
 // - POST   /api/items?list=<name>  { items: {...} } -> 204 (bulk set)
 // - DELETE /api/items?list=<name>                 -> 204 (clear)
 
-const { kv } = require("@vercel/kv");
+const { Redis } = require("@upstash/redis");
+
+function getRedis(){
+  // When Upstash is connected via Vercel Storage, these env vars are auto-injected:
+  // - UPSTASH_REDIS_REST_URL
+  // - UPSTASH_REDIS_REST_TOKEN
+  const url = process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  if (!url || !token) return null;
+  return Redis.fromEnv();
+}
 
 async function readJson(req) {
   if (req.body && typeof req.body === "object") return req.body;
@@ -55,15 +65,22 @@ module.exports = async (req, res) => {
 
   const list = getList(req);
   const key = `checklist:${list}`;
+  const redis = getRedis();
+  if (!redis) {
+    return res.status(500).json({
+      error: "Redis not configured",
+      detail: "Missing UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN. Connect Upstash for Redis (or Redis) in Vercel Storage to this project (Preview + Production), then redeploy."
+    });
+  }
 
   try {
     if (req.method === "GET") {
-      const hash = await kv.hgetall(key);
+      const hash = await redis.hgetall(key);
       return res.status(200).json({ list, items: normalizeToBoolMap(hash) });
     }
 
     if (req.method === "DELETE") {
-      await kv.del(key);
+      await redis.del(key);
       return res.status(204).end();
     }
 
@@ -73,7 +90,7 @@ module.exports = async (req, res) => {
         return res.status(400).json({ error: "Missing id" });
       }
       const done = !!body.done;
-      await kv.hset(key, { [body.id]: done ? 1 : 0 });
+      await redis.hset(key, { [body.id]: done ? 1 : 0 });
       return res.status(204).end();
     }
 
@@ -88,12 +105,12 @@ module.exports = async (req, res) => {
         if (!id) continue;
         toSet[id] = done ? 1 : 0;
       }
-      if (Object.keys(toSet).length) await kv.hset(key, toSet);
+      if (Object.keys(toSet).length) await redis.hset(key, toSet);
       return res.status(204).end();
     }
 
     return res.status(405).json({ error: "Method not allowed" });
   } catch (err) {
-    return res.status(500).json({ error: "KV error", detail: String(err && err.message ? err.message : err) });
+    return res.status(500).json({ error: "Redis error", detail: String(err && err.message ? err.message : err) });
   }
 };
